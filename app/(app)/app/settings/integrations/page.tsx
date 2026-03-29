@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { isBillingEnabled } from "@/lib/billing";
 import { db } from "@/lib/db";
 import EmailAddressCopy from "../../../settings/integrations/EmailAddressCopy";
 import SettingsNav from "@/components/SettingsNav";
@@ -21,7 +22,7 @@ export default async function AppIntegrationsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <SettingsNav />
+      <SettingsNav showBilling={isBillingEnabled()} />
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-text-primary">Integrations</h1>
         <p className="mt-1 text-sm text-text-mid">Connect your favourite capture surfaces to Recall.</p>

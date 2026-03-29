@@ -6,6 +6,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(1).optional(),
   APP_URL: z.string().url().optional(),
   APP_DOMAIN: z.string().min(1).optional(),
+  SELF_HOSTED: z.enum(["true", "false"]).optional(),
   FILES_BASE_PATH: z.string().min(1).default("/tmp/recall/files"),
   INTERNAL_INGEST_TOKEN: z.string().min(1).optional(),
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
@@ -19,6 +20,12 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
+  RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
+  RAZORPAY_PLAN_STARTER_YEARLY_ID: z.string().min(1).optional(),
+  RAZORPAY_PLAN_PRO_YEARLY_ID: z.string().min(1).optional(),
   DEV_BYPASS_LOGIN: z.enum(["true", "false"]).optional(),
 });
 

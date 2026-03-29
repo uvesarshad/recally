@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { canUserSave, Plan, PLAN_LIMITS } from "@/lib/plan-limits";
+import { canUserSave, getPlanLimits, Plan } from "@/lib/plan-limits";
 import { inferCaptureActions } from "./comment-actions";
 import { isAcceptedMimeType, saveFile } from "./storage";
 
@@ -44,7 +44,7 @@ export async function ingestItem(payload: IngestPayload) {
 
   // File size check
   if (payload.fileBuffer) {
-    const limitMB = PLAN_LIMITS[user.plan as Plan].maxFileUploadSizeMB;
+    const limitMB = getPlanLimits(user.plan as Plan).maxFileUploadSizeMB;
     if (payload.fileBuffer.length > limitMB * 1024 * 1024) {
       return { error: "file_too_large" };
     }

@@ -1,14 +1,14 @@
 import SettingsNav from "@/components/SettingsNav";
+import BillingSettingsClient from "../../../settings/billing/billing-settings-client";
 import { isBillingEnabled } from "@/lib/billing";
-import ProfileSettingsClient from "../../../settings/profile/profile-settings-client";
 
 export const dynamic = "force-dynamic";
 
-export default function AppProfileSettingsPage() {
+export default function AppBillingSettingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-5 py-8">
       <SettingsNav showBilling={isBillingEnabled()} />
-      <ProfileSettingsClient />
+      <BillingSettingsClient />
     </div>
   );
 }

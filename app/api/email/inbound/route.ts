@@ -2,6 +2,7 @@ import { apiError, apiOk } from "@/lib/api";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { ingestItem } from "@/lib/ingest";
+import { canUseEmailIngest, Plan } from "@/lib/plan-limits";
 import { emailInboundSchema } from "@/lib/validation";
 import { Resend } from "resend";
 
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
   const user = userResult.rows[0];
 
   // Enforce plan gating: Free plan cannot use email capture
-  if (user.plan === "free") {
+  if (!canUseEmailIngest(user.plan as Plan)) {
     return apiError("Email capture not available on free plan", 402);
   }
 

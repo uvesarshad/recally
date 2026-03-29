@@ -1,4 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
+import { isBillingEnabled, isSelfHosted } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { requireSessionUser } from "@/lib/request-auth";
 import { z } from "zod";
@@ -21,13 +22,22 @@ export async function GET() {
 
   const result = await db.query(
     `SELECT id, email, name, bio, timezone, marketing_consent, analytics_consent,
-            inbound_email_address, plan, created_at
+            inbound_email_address, plan, created_at,
+            subscription_plan, subscription_status, subscription_current_start,
+            subscription_current_end, subscription_cancel_at_cycle_end,
+            razorpay_subscription_id
      FROM users
      WHERE id = $1`,
     [user.id],
   );
 
-  return apiOk({ user: result.rows[0] ?? null });
+  return apiOk({
+    user: result.rows[0] ?? null,
+    billing: {
+      enabled: isBillingEnabled(),
+      selfHosted: isSelfHosted(),
+    },
+  });
 }
 
 export async function PATCH(req: Request) {
@@ -46,11 +56,19 @@ export async function PATCH(req: Request) {
          analytics_consent = $5,
          updated_at = NOW()
      WHERE id = $6
-     RETURNING id, email, name, bio, timezone, marketing_consent, analytics_consent, inbound_email_address, plan, created_at`,
+     RETURNING id, email, name, bio, timezone, marketing_consent, analytics_consent, inbound_email_address, plan, created_at,
+               subscription_plan, subscription_status, subscription_current_start, subscription_current_end,
+               subscription_cancel_at_cycle_end, razorpay_subscription_id`,
     [data.name, data.bio, data.timezone, data.marketing_consent, data.analytics_consent, user.id],
   );
 
-  return apiOk({ user: result.rows[0] });
+  return apiOk({
+    user: result.rows[0],
+    billing: {
+      enabled: isBillingEnabled(),
+      selfHosted: isSelfHosted(),
+    },
+  });
 }
 
 export async function DELETE() {

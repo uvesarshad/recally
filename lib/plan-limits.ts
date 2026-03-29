@@ -24,6 +24,26 @@ export const PLAN_LIMITS = {
   },
 };
 
+const SELF_HOSTED_LIMITS = {
+  maxSavesPerMonth: Infinity,
+  maxFileUploadSizeMB: Number.MAX_SAFE_INTEGER,
+  maxReminders: Infinity,
+  emailIngest: true,
+  chatQueriesPerDay: Infinity,
+};
+
+function isSelfHostedMode() {
+  return process.env.SELF_HOSTED === "true";
+}
+
+export function getPlanLimits(plan: Plan) {
+  return isSelfHostedMode() ? SELF_HOSTED_LIMITS : PLAN_LIMITS[plan];
+}
+
 export function canUserSave(plan: Plan, savesThisMonth: number) {
-  return savesThisMonth < PLAN_LIMITS[plan].maxSavesPerMonth;
+  return savesThisMonth < getPlanLimits(plan).maxSavesPerMonth;
+}
+
+export function canUseEmailIngest(plan: Plan) {
+  return getPlanLimits(plan).emailIngest;
 }

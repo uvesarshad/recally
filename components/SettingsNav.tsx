@@ -6,14 +6,16 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/app/settings/profile", label: "Profile" },
   { href: "/app/settings/integrations", label: "Integrations" },
+  { href: "/app/settings/billing", label: "Billing", billingOnly: true },
 ];
 
-export default function SettingsNav() {
+export default function SettingsNav({ showBilling = true }: { showBilling?: boolean }) {
   const pathname = usePathname();
+  const visibleLinks = links.filter((link) => showBilling || !link.billingOnly);
 
   return (
     <div className="mb-6 flex flex-wrap gap-2">
-      {links.map((link) => {
+      {visibleLinks.map((link) => {
         const active = pathname === link.href;
         return (
           <Link
