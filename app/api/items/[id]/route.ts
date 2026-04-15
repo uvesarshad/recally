@@ -57,7 +57,7 @@ export async function PATCH(
   
   // Build dynamic update query
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let idx = 1;
 
   if (data.title !== undefined) {

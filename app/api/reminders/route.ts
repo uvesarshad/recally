@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 }
 
 // GET /api/reminders - Get all reminders (for potential UI)
-export async function GET(req: Request) {
+export async function GET() {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

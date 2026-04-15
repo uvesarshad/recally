@@ -11,7 +11,7 @@ const collectionSchema = z.object({
   icon: z.string().trim().max(50).optional(),
 });
 
-export async function GET(req: Request) {
+export async function GET() {
   const user = await requireSessionUser();
   if (!user) {
     return apiError("Unauthorized", 401);

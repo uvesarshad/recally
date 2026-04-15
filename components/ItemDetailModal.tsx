@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Calendar, ExternalLink, Link2, MessageSquare, Tag, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import ActionPreview, { type ActionOverrideValue, type ActionPreviewValue } from "@/components/ActionPreview";
 import { resolvePreviewImageUrl } from "@/lib/item-preview";
+import type { ArchiveComment, ArchiveItem, CollectionRecord } from "@/lib/types";
 
 interface ItemDetailModalProps {
   itemId: string;
@@ -13,9 +14,9 @@ interface ItemDetailModalProps {
 }
 
 export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailModalProps) {
-  const [item, setItem] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [collections, setCollections] = useState<Array<{ id: string; name: string }>>([]);
+  const [item, setItem] = useState<ArchiveItem | null>(null);
+  const [comments, setComments] = useState<ArchiveComment[]>([]);
+  const [collections, setCollections] = useState<Array<Pick<CollectionRecord, "id" | "name">>>([]);
   const [comment, setComment] = useState("");
   const [applied, setApplied] = useState<string[]>([]);
   const [preview, setPreview] = useState<ActionPreviewValue | null>(null);
@@ -30,25 +31,25 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
   const [draftReminderAt, setDraftReminderAt] = useState("");
   const router = useRouter();
 
-  async function load() {
+  const load = useCallback(async () => {
     const [itemRes, commentsRes, collectionsRes] = await Promise.all([
       fetch(`/api/items/${itemId}`),
       fetch(`/api/items/${itemId}/comments`),
       fetch("/api/collections"),
     ]);
-    const itemData = await itemRes.json();
-    const commentsData = await commentsRes.json();
-    const collectionsData = await collectionsRes.json();
-    setItem(itemData.item);
+    const itemData = (await itemRes.json()) as { item?: ArchiveItem | null };
+    const commentsData = (await commentsRes.json()) as { comments?: ArchiveComment[] };
+    const collectionsData = (await collectionsRes.json()) as { collections?: Array<Pick<CollectionRecord, "id" | "name">> };
+    setItem(itemData.item ?? null);
     setComments(commentsData.comments || []);
     setCollections(collectionsData.collections || []);
-  }
+  }, [itemId]);
 
   useEffect(() => {
     if (open) {
       void load();
     }
-  }, [open, itemId]);
+  }, [load, open]);
 
   useEffect(() => {
     if (!open || !comment.trim()) {

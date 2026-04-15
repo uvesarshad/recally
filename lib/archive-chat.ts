@@ -8,6 +8,15 @@ type ArchiveCitation = {
   url?: string | null;
 };
 
+type ArchiveQueryRow = {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  raw_text: string | null;
+  raw_url: string | null;
+  similarity: number | string;
+};
+
 export async function answerArchiveQuestion({
   userId,
   query,
@@ -35,7 +44,7 @@ export async function answerArchiveQuestion({
     return { answer: "I couldn't read that question. Please try again.", citations: [] as ArchiveCitation[] };
   }
 
-  const relevantItems = await db.query(
+  const relevantItems = await db.query<ArchiveQueryRow>(
     `SELECT id, title, summary, raw_text, raw_url, type,
             1 - (embedding <=> $2::vector) as similarity
      FROM items
@@ -45,7 +54,7 @@ export async function answerArchiveQuestion({
     [userId, JSON.stringify(embedding)]
   );
 
-  const filteredItems = relevantItems.rows.filter((item: any) => Number(item.similarity) > 0.68);
+  const filteredItems = relevantItems.rows.filter((item) => Number(item.similarity) > 0.68);
   if (filteredItems.length === 0) {
     return {
       answer: "I couldn't find any saved items related to your question.",
@@ -54,7 +63,7 @@ export async function answerArchiveQuestion({
   }
 
   const contextItems = filteredItems
-    .map((item: any) => {
+    .map((item) => {
       let content = `Title: ${item.title || "Untitled"}`;
       if (item.summary) content += `\nSummary: ${item.summary}`;
       if (item.raw_text) content += `\nContent: ${String(item.raw_text).slice(0, 700)}`;
@@ -78,7 +87,7 @@ ${contextItems}`;
   ]);
 
   const answer = result.response.text().trim() || "I couldn't generate an answer from your saved items.";
-  const citations = filteredItems.slice(0, 3).map((item: any) => ({
+  const citations = filteredItems.slice(0, 3).map((item) => ({
     id: item.id,
     title: item.title,
     url: item.raw_url,

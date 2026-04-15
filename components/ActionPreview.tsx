@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
+import type { CollectionRecord } from "@/lib/types";
 
 export interface ActionPreviewValue {
   tags: string[];
@@ -40,7 +41,7 @@ export default function ActionPreview({
     Object.prototype.hasOwnProperty.call(overrides, "reminderAt")
       ? overrides.reminderAt ?? null
       : preview.reminderAt;
-  const [collections, setCollections] = useState<Array<{ id: string; name: string }>>([]);
+  const [collections, setCollections] = useState<Array<Pick<CollectionRecord, "id" | "name">>>([]);
   const [tagInput, setTagInput] = useState("");
   const [showCategoryEditor, setShowCategoryEditor] = useState(false);
   const [showReminderEditor, setShowReminderEditor] = useState(false);
@@ -52,10 +53,6 @@ export default function ActionPreview({
       .then((data) => setCollections(data.collections || []))
       .catch(() => setCollections([]));
   }, []);
-
-  useEffect(() => {
-    setCategoryInput(activeCategoryName || "");
-  }, [activeCategoryName]);
 
   const reminderInputValue = useMemo(() => {
     if (!activeReminderAt) return "";
@@ -107,7 +104,13 @@ export default function ActionPreview({
         ))}
         {activeCategoryName ? (
           <div className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-1 text-xs text-text-primary">
-            <button type="button" onClick={() => setShowCategoryEditor((v) => !v)}>
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryInput(activeCategoryName);
+                setShowCategoryEditor((value) => !value);
+              }}
+            >
               Folder: {activeCategoryName}
             </button>
             <button type="button" onClick={() => onChange({ ...overrides, categoryName: null })}>
@@ -145,6 +148,7 @@ export default function ActionPreview({
                 type="button"
                 onClick={() => {
                   onChange({ ...overrides, categoryName: collection.name });
+                  setCategoryInput(collection.name);
                   setShowCategoryEditor(false);
                 }}
                 className="rounded-full bg-bg px-2 py-1 text-xs text-text-primary"

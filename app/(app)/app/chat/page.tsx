@@ -126,7 +126,7 @@ export default function ChatPage() {
                   return newMessages;
                 });
               }
-            } catch (e) {
+            } catch {
               // Skip malformed JSON
             }
           }

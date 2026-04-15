@@ -6,62 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ItemCard from "@/components/ItemCard";
 import Tooltip from "@/components/Tooltip";
 import { useStoredState } from "@/lib/hooks";
+import type { ArchiveItem, CollectionRecord } from "@/lib/types";
 
 type FeedView = "grid" | "list";
 type FeedSort = "newest" | "oldest" | "title";
 type FeedType = "all" | "url" | "text" | "note" | "file";
 type FeedSource = "all" | "telegram" | "pwa-share" | "email" | "web" | "manual";
 type ItemType = Exclude<FeedType, "all">;
-
-type FeedItem = {
-  id: string;
-  type: ItemType;
-  title?: string | null;
-  summary?: string | null;
-  tags?: string[] | null;
-  source?: string | null;
-  created_at: string;
-  updated_at?: string;
-  raw_url?: string | null;
-  raw_text?: string | null;
-  collection_id?: string | null;
-  collection_name?: string | null;
-  canvas_x?: number | null;
-  canvas_y?: number | null;
-  canvas_pinned?: boolean;
-  enriched?: boolean;
-  reminder_at?: string | null;
-  reminder_sent?: boolean;
-  file_name?: string | null;
-  file_mime_type?: string | null;
-  image_url?: string | null;
-  snippet?: string;
-};
-
-type Folder = {
-  id: string;
-  name: string;
-  color?: string | null;
-  icon?: string | null;
-};
-
-function useStoredView(defaultView: FeedView) {
-  const [view, setView] = useState<FeedView>(defaultView);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("recall-feed-view");
-    if (stored === "grid" || stored === "list") {
-      setView(stored);
-    }
-  }, []);
-
-  function update(next: FeedView) {
-    setView(next);
-    window.localStorage.setItem("recall-feed-view", next);
-  }
-
-  return [view, update] as const;
-}
+type FeedItem = ArchiveItem & { type: ItemType };
+type Folder = CollectionRecord;
 
 const typeOptions: Array<{ label: string; value: FeedType }> = [
   { label: "All items", value: "all" },
@@ -97,7 +50,7 @@ export default function FeedPageClient({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [view, setView] = useStoredView("list");
+  const [view, setView] = useStoredState<FeedView>("recall-feed-view", "list");
   const [sort, setSort] = useState<FeedSort>("newest");
   const [typeFilter, setTypeFilter] = useState<FeedType>("all");
   const [sourceFilter, setSourceFilter] = useState<FeedSource>("all");
@@ -202,7 +155,7 @@ export default function FeedPageClient({
     const response = await fetch("/api/collections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, icon: "📁" }),
+      body: JSON.stringify({ name, icon: "folder" }),
     });
 
     if (!response.ok) {
@@ -490,7 +443,7 @@ export default function FeedPageClient({
                         : "border-border bg-bg text-text-mid hover:text-text-primary"
                     }`}
                   >
-                    {folder.icon || "📁"} {folder.name} <span className={active ? "text-white/80" : "text-text-muted"}>{folder.count}</span>
+                    {folder.icon || "folder"} {folder.name} <span className={active ? "text-white/80" : "text-text-muted"}>{folder.count}</span>
                   </button>
                 );
               })}

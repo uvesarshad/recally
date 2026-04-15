@@ -16,6 +16,7 @@ import {
   type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
+import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import "@xyflow/react/dist/style.css";
 import { Pin, PinOff, RefreshCw } from "lucide-react";
 import ItemDetailModal from "@/components/ItemDetailModal";
@@ -61,6 +62,8 @@ type ItemNodeData = {
 };
 
 type ItemFlowNode = Node<ItemNodeData, "recallItem">;
+type GraphCanvasNode = NodeObject<GraphNode & { color: string; nodeTypeColor: string }>;
+type GraphCanvasLink = LinkObject<GraphNode & { color: string; nodeTypeColor: string }, GraphEdgeRecord>;
 
 const relationLabels: Record<GraphEdgeRecord["relation_type"], string> = {
   ai_similar: "Similar",
@@ -326,39 +329,57 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
               })),
             }}
             nodeRelSize={7}
-            linkWidth={(link: any) => 1 + Number(link.strength) * 2}
-            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-              const label = getTitle(node);
+            linkWidth={(link) => 1 + Number((link as GraphCanvasLink).strength ?? 0) * 2}
+            nodeCanvasObject={(node, ctx: CanvasRenderingContext2D, globalScale: number) => {
+              const graphNode = node as GraphCanvasNode;
+              if (typeof graphNode.x !== "number" || typeof graphNode.y !== "number") {
+                return;
+              }
+
+              const label = getTitle(graphNode);
               const fontSize = 11 / globalScale;
               const size = 18;
               ctx.save();
-              ctx.translate(node.x, node.y);
+              ctx.translate(graphNode.x, graphNode.y);
               ctx.rotate(Math.PI / 4);
               ctx.beginPath();
               ctx.rect(-size / 2, -size / 2, size, size);
-              ctx.fillStyle = node.color;
+              ctx.fillStyle = graphNode.color;
               ctx.fill();
               ctx.beginPath();
               ctx.arc(0, 0, 4.5, 0, 2 * Math.PI, false);
-              ctx.fillStyle = node.nodeTypeColor;
+              ctx.fillStyle = graphNode.nodeTypeColor;
               ctx.fill();
               ctx.restore();
               ctx.font = `600 ${fontSize}px "Geist Mono", monospace`;
               ctx.fillStyle = "#a1a1aa";
-              ctx.fillText(label, node.x + 14, node.y + 4);
+              ctx.fillText(label, graphNode.x + 14, graphNode.y + 4);
             }}
             linkCanvasObjectMode={() => "after"}
-            linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D) => {
-              const start = link.source;
-              const end = link.target;
-              if (!start || !end) return;
+            linkCanvasObject={(link, ctx: CanvasRenderingContext2D) => {
+              const graphLink = link as GraphCanvasLink;
+              const start = graphLink.source;
+              const end = graphLink.target;
+              if (typeof start === "string" || typeof start === "number" || typeof end === "string" || typeof end === "number") {
+                return;
+              }
+              if (
+                !start ||
+                !end ||
+                typeof start.x !== "number" ||
+                typeof start.y !== "number" ||
+                typeof end.x !== "number" ||
+                typeof end.y !== "number"
+              ) {
+                return;
+              }
               const midX = (start.x + end.x) / 2;
               const midY = (start.y + end.y) / 2;
               ctx.fillStyle = "#71717a";
               ctx.font = '10px "Geist Mono", monospace';
-              ctx.fillText(relationLabels[link.relation_type as GraphEdgeRecord["relation_type"]], midX, midY);
+              ctx.fillText(relationLabels[graphLink.relation_type], midX, midY);
             }}
-            onNodeClick={(node: any) => setSelectedId(node.id)}
+            onNodeClick={(node) => setSelectedId(typeof node.id === "string" ? node.id : null)}
           />
         </div>
       )}

@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { Shield, Trash2, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ProfileRecord } from "@/lib/types";
 
 export default function ProfileSettingsClient() {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -13,9 +14,13 @@ export default function ProfileSettingsClient() {
   useEffect(() => {
     void fetch("/api/me")
       .then((res) => res.json())
-      .then((data) => setProfile(data.user))
+      .then((data: { user?: ProfileRecord | null }) => setProfile(data.user ?? null))
       .finally(() => setLoading(false));
   }, []);
+
+  function updateProfile(patch: Partial<ProfileRecord>) {
+    setProfile((current) => (current ? { ...current, ...patch } : current));
+  }
 
   async function saveProfile() {
     setSaving(true);
@@ -57,14 +62,14 @@ export default function ProfileSettingsClient() {
         <div className="grid gap-4 md:grid-cols-2">
           <input
             value={profile.name || ""}
-            onChange={(e) => setProfile((current: any) => ({ ...current, name: e.target.value }))}
+            onChange={(e) => updateProfile({ name: e.target.value })}
             placeholder="Name"
             className="rounded-input border border-border bg-bg px-4 py-3 text-sm outline-none focus:border-brand"
           />
           <input value={profile.email || ""} disabled className="rounded-input border border-border bg-bg px-4 py-3 text-sm text-text-muted" />
           <input
             value={profile.timezone || ""}
-            onChange={(e) => setProfile((current: any) => ({ ...current, timezone: e.target.value }))}
+            onChange={(e) => updateProfile({ timezone: e.target.value })}
             placeholder="Timezone"
             className="rounded-input border border-border bg-bg px-4 py-3 text-sm outline-none focus:border-brand"
           />
@@ -72,7 +77,7 @@ export default function ProfileSettingsClient() {
         </div>
         <textarea
           value={profile.bio || ""}
-          onChange={(e) => setProfile((current: any) => ({ ...current, bio: e.target.value }))}
+          onChange={(e) => updateProfile({ bio: e.target.value })}
           rows={4}
           placeholder="Short bio"
           className="mt-4 w-full rounded-input border border-border bg-bg px-4 py-3 text-sm outline-none focus:border-brand"
@@ -107,7 +112,7 @@ export default function ProfileSettingsClient() {
             <input
               type="checkbox"
               checked={!!profile.marketing_consent}
-              onChange={(e) => setProfile((current: any) => ({ ...current, marketing_consent: e.target.checked }))}
+              onChange={(e) => updateProfile({ marketing_consent: e.target.checked })}
             />
           </label>
           <label className="flex items-center justify-between rounded-cards border border-border bg-bg px-4 py-3">
@@ -115,7 +120,7 @@ export default function ProfileSettingsClient() {
             <input
               type="checkbox"
               checked={!!profile.analytics_consent}
-              onChange={(e) => setProfile((current: any) => ({ ...current, analytics_consent: e.target.checked }))}
+              onChange={(e) => updateProfile({ analytics_consent: e.target.checked })}
             />
           </label>
         </div>

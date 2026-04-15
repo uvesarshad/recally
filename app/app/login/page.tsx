@@ -19,7 +19,14 @@ export default async function AppLoginPage({
     redirect("/app");
   }
 
-  const session = await auth();
+  let session;
+  try {
+    session = await auth();
+  } catch (error) {
+    console.error("Auth error in login page:", error);
+    session = null;
+  }
+  
   if (session?.user?.id) {
     redirect("/app");
   }

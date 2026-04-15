@@ -10,6 +10,10 @@ const singleIngestRequestSchema = ingestPayloadSchema.extend({
 
 const bulkIngestRequestSchema = bulkIngestPayloadSchema;
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected ingest failure";
+}
+
 export async function POST(req: Request) {
   const user = await requireIngestUser(req);
   if (!user) {
@@ -31,8 +35,8 @@ export async function POST(req: Request) {
       }
 
       return apiOk(result);
-    } catch (err: any) {
-      return apiError(err.message, 500);
+    } catch (error) {
+      return apiError(getErrorMessage(error), 500);
     }
   }
 
@@ -67,7 +71,7 @@ export async function POST(req: Request) {
       count: results.length,
       items: results,
     });
-  } catch (err: any) {
-    return apiError(err.message, 500);
+  } catch (error) {
+    return apiError(getErrorMessage(error), 500);
   }
 }

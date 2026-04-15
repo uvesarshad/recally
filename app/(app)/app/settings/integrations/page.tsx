@@ -69,7 +69,7 @@ export default async function AppIntegrationsPage() {
 
           <EmailAddressCopy address={user.inbound_email_address} />
           <p className="mt-3 text-[11px] text-text-muted">
-            Tip: Save this as a contact named "Recall" in your phone.
+            Tip: Save this as a contact named &quot;Recall&quot; in your phone.
           </p>
         </section>
       </div>

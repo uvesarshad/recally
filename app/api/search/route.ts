@@ -2,11 +2,25 @@ import { apiError, apiOk } from "@/lib/api";
 import { db } from "@/lib/db";
 import { embedText } from "@/lib/gemini";
 import { requireSessionUser } from "@/lib/request-auth";
+import type { ArchiveItem } from "@/lib/types";
 import { hasVectorSupport } from "@/lib/vector";
 
 export const dynamic = "force-dynamic";
 
-function makeSnippet(query: string, item: Record<string, unknown>) {
+type SearchItem = ArchiveItem & {
+  rank?: number;
+  similarity?: number | string;
+  snippet?: string | null;
+};
+
+function makeSnippet(
+  query: string,
+  item: {
+    title?: string | null;
+    summary?: string | null;
+    raw_text?: string | null;
+  },
+) {
   const haystack = [item.title, item.summary, item.raw_text]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join(" ");
@@ -45,7 +59,7 @@ export async function GET(req: Request) {
   }
 
   if (mode === "fulltext") {
-    const result = await db.query(
+    const result = await db.query<SearchItem>(
       `SELECT id, type, title, summary, tags, source, created_at, raw_url, raw_text,
               ts_rank(
                 setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
@@ -73,7 +87,7 @@ export async function GET(req: Request) {
         return apiOk({ items: [], exact: [], semantic: [] });
       }
 
-      const fulltextResult = await db.query(
+      const fulltextResult = await db.query<SearchItem>(
         `SELECT id, type, title, summary, tags, source, created_at, raw_url, raw_text,
                 ts_rank(
                   setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
@@ -99,7 +113,7 @@ export async function GET(req: Request) {
       return apiOk({ items: [], exact: [], semantic: [] });
     }
 
-    const semanticResult = await db.query(
+    const semanticResult = await db.query<SearchItem>(
       `SELECT id, type, title, summary, tags, source, created_at, raw_url, raw_text,
               1 - (embedding <=> $1::vector) as similarity
        FROM items 
@@ -119,7 +133,7 @@ export async function GET(req: Request) {
       return apiOk({ items: semantic, exact: [], semantic });
     }
 
-    const fulltextResult = await db.query(
+    const fulltextResult = await db.query<SearchItem>(
       `SELECT id, type, title, summary, tags, source, created_at, raw_url, raw_text,
               ts_rank(
                 setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
@@ -137,9 +151,9 @@ export async function GET(req: Request) {
     );
 
     const exact = fulltextResult.rows.map((item) => ({ ...item, snippet: makeSnippet(query, item) }));
-    const exactIds = new Set(exact.map((item: any) => item.id));
-    const merged = [...exact, ...semantic.filter((item: any) => !exactIds.has(item.id))];
-    const deduped = Array.from(new Map(merged.map(item => [item.id, item])).values());
+    const exactIds = new Set(exact.map((item) => item.id));
+    const merged = [...exact, ...semantic.filter((item) => !exactIds.has(item.id))];
+    const deduped = Array.from(new Map(merged.map((item) => [item.id, item])).values());
 
     return apiOk({ items: deduped, exact, semantic });
   }

@@ -1,13 +1,11 @@
 import { auth } from "@/lib/auth";
 import { getFileBuffer } from "@/lib/storage";
 import { db } from "@/lib/db";
-import { NextResponse } from "next/server";
-import path from "path";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const session = await auth();
@@ -42,7 +40,7 @@ export async function GET(
         "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
-  } catch (err) {
+  } catch {
     return new Response("File not found on disk", { status: 404 });
   }
 }

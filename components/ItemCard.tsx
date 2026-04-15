@@ -5,6 +5,7 @@ import { Bell, File, FileText, Link2, MessageSquare, StickyNote, Trash2 } from "
 import { useRouter } from "next/navigation";
 import ItemDetailModal from "@/components/ItemDetailModal";
 import { resolvePreviewImageUrl } from "@/lib/item-preview";
+import type { ArchiveItem } from "@/lib/types";
 
 const sourceLabel: Record<string, string> = {
   telegram: "Telegram",
@@ -20,7 +21,7 @@ export default function ItemCard({
   highlight,
   view = "list",
 }: {
-  item: any;
+  item: ArchiveItem;
   highlight?: string;
   view?: "grid" | "list";
 }) {
@@ -127,7 +128,7 @@ export default function ItemCard({
           {!item.summary && item.snippet ? <p className="mt-1 line-clamp-3 text-xs text-text-mid">{item.snippet}</p> : null}
         </div>
 
-        {(item.collection_name || item.tags?.length > 0 || item.reminder_at) ? (
+        {(item.collection_name || (item.tags?.length ?? 0) > 0 || item.reminder_at) ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {item.source ? (
               <span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] text-text-mid">

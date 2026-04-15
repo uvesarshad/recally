@@ -5,7 +5,40 @@ import { env } from "@/lib/env";
 import { ingestItem } from "@/lib/ingest";
 import { getTelegramBotUrl, getTelegramFile, sendTelegramMessage } from "@/lib/telegram";
 
-function getForwardedText(message: any) {
+type TelegramMessage = {
+  text?: string;
+  caption?: string;
+  forward_sender_name?: string;
+  forward_origin?: {
+    chat?: { title?: string };
+    sender_user?: { username?: string };
+  };
+  chat: { id: number };
+  document?: {
+    file_id: string;
+    file_name?: string;
+    mime_type?: string;
+  };
+  photo?: Array<{
+    file_id: string;
+    file_unique_id: string;
+  }>;
+};
+
+type TelegramUpdate = {
+  message?: TelegramMessage;
+};
+
+type TelegramListRow = {
+  id: string;
+  type: string;
+  title: string | null;
+  raw_url: string | null;
+  raw_text: string | null;
+  created_at: string;
+};
+
+function getForwardedText(message: TelegramMessage) {
   if (typeof message.text === "string" && message.text.trim()) return message.text;
   if (typeof message.caption === "string" && message.caption.trim()) return message.caption;
 
@@ -33,7 +66,7 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const update = await req.json();
+  const update = (await req.json()) as TelegramUpdate;
 
   if (!update.message) {
     return apiOk({ ok: true });
@@ -264,7 +297,7 @@ async function answerQuestionReply(userId: string, question: string) {
 async function buildListReply(userId: string, request: string) {
   const parsed = parseListRequest(request);
   const conditions = ["user_id = $1"];
-  const params: any[] = [userId];
+  const params: unknown[] = [userId];
   let paramIndex = 2;
 
   if (parsed.type) {
@@ -288,7 +321,7 @@ async function buildListReply(userId: string, request: string) {
     paramIndex++;
   }
 
-  const result = await db.query(
+  const result = await db.query<TelegramListRow>(
     `SELECT id, type, title, raw_url, raw_text, created_at
      FROM items
      WHERE ${conditions.join(" AND ")}
@@ -302,7 +335,7 @@ async function buildListReply(userId: string, request: string) {
   }
 
   const heading = request ? `Latest matches for: <b>${escapeHtml(request)}</b>` : "Latest saved items";
-  const lines = result.rows.map((item: any, index: number) => {
+  const lines = result.rows.map((item: TelegramListRow, index: number) => {
     const label = item.title || item.raw_url || rawLabel(item.raw_text || "Untitled");
     const suffix = item.raw_url ? `\n   ${escapeHtml(item.raw_url)}` : "";
     return `${index + 1}. <b>${escapeHtml(rawLabel(label))}</b> (${item.type}, ${formatShortDate(item.created_at)})${suffix}`;

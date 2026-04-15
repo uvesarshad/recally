@@ -24,7 +24,7 @@ export async function PATCH(
   const data = collectionUpdateSchema.parse(await req.json());
   
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let idx = 1;
 
   if (data.name !== undefined) {

@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 
 export function useStoredState<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === "undefined") {
+      return initial;
+    }
 
-  useEffect(() => {
     try {
       const stored = window.localStorage.getItem(key);
-      if (stored !== null) {
-        setValue(JSON.parse(stored));
-      }
-    } catch {}
-  }, [key]);
+      return stored !== null ? (JSON.parse(stored) as T) : initial;
+    } catch {
+      return initial;
+    }
+  });
 
   useEffect(() => {
     try {

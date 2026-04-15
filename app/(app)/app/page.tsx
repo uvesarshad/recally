@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import FeedPageClient from "@/components/FeedPageClient";
+import type { ArchiveItem, CollectionRecord } from "@/lib/types";
 import { Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +10,7 @@ export const dynamic = "force-dynamic";
 const INITIAL_ITEMS_LIMIT = 50;
 
 async function getItems(userId: string) {
-  const result = await db.query(
+  const result = await db.query<ArchiveItem>(
     `SELECT items.id,
             items.type,
             items.title,
@@ -49,7 +51,7 @@ async function getItems(userId: string) {
 }
 
 async function getFolders(userId: string) {
-  const result = await db.query(
+  const result = await db.query<CollectionRecord>(
     "SELECT * FROM collections WHERE user_id = $1 ORDER BY name ASC",
     [userId],
   );
@@ -61,9 +63,19 @@ export default async function AppFeedPage({
 }: {
   searchParams?: Promise<{ saved?: string; error?: string }>;
 }) {
-  const session = await auth();
-  const { items, hasMore, nextCursor } = await getItems(session!.user!.id!);
-  const folders = await getFolders(session!.user!.id!);
+  let session;
+  try {
+    session = await auth();
+  } catch (error) {
+    console.error("Auth error in feed page:", error);
+    session = null;
+  }
+
+  if (!session?.user?.id) {
+    redirect("/app/login");
+  }
+  const { items, hasMore, nextCursor } = await getItems(session.user.id);
+  const folders = await getFolders(session.user.id);
   const params = await searchParams;
   const saved = params?.saved === "true";
   const error = params?.error;

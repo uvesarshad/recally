@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import ItemCard from "@/components/ItemCard";
 import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import type { ArchiveItem } from "@/lib/types";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
-  const [exactMatches, setExactMatches] = useState<any[]>([]);
-  const [semanticMatches, setSemanticMatches] = useState<any[]>([]);
+  const [exactMatches, setExactMatches] = useState<ArchiveItem[]>([]);
+  const [semanticMatches, setSemanticMatches] = useState<ArchiveItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function SearchPage() {
       setLoading(true);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&mode=hybrid`);
-        const data = await res.json();
+        const data = (await res.json()) as { exact?: ArchiveItem[]; semantic?: ArchiveItem[] };
         setExactMatches(data.exact || []);
         setSemanticMatches(data.semantic || []);
       } catch (err) {
@@ -63,7 +64,7 @@ export default function SearchPage() {
 
         {!loading && query && exactMatches.length === 0 && semanticMatches.length === 0 && (
           <div className="text-center py-12 border border-dashed border-border rounded-modals">
-            <p className="text-sm text-text-mid">No items found matching "{query}"</p>
+            <p className="text-sm text-text-mid">No items found matching &quot;{query}&quot;</p>
           </div>
         )}
 

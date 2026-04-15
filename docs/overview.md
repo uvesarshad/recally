@@ -20,10 +20,10 @@ Recally is a Next.js application designed to be a personal "second brain." It al
   - **AI:** Google Gemini (`@google/generative-ai`)
   - **Background Workers:** Node.js scripts executed with `tsx`.
 - **Environment:**
-  - **Node Version:** [PLACEHOLDER: Specify required Node.js version, e.g., 20.x]
+  - **Node Version:** Not pinned in `package.json`. Align the runtime with the currently installed Next.js toolchain before deploying or upgrading dependencies.
   - **Next.js Version:** `latest`
   - **Rendering Strategy:** Primarily Server-Side Rendering (SSR) with Server Components. Client-Side Rendering (CSR) is used for highly interactive components.
-  - **Deployment Target:** [PLACEHOLDER: Specify deployment platform, e.g., Vercel, AWS Amplify]
+  - **Deployment Target:** No platform-specific deployment adapter is hard-coded in the repo. Any host that can run a Next.js App Router app with the required environment variables, PostgreSQL access, and file storage integration can be used.
 
 ## Documentation Directory
 
@@ -51,7 +51,7 @@ Recally is a Next.js application designed to be a personal "second brain." It al
 - **Authentication:** Handled by `next-auth`. The main configuration is in `app/api/auth/[...nextauth]/route.ts`, with session data managed via server-side utilities in `lib/auth.ts`. Most pages and APIs require an authenticated session.
 - **Data Fetching:** Primarily done in Server Components by directly calling functions from `lib/`. Client-side data fetching is used for dynamic UI elements and uses standard `fetch` calls to the application's API routes.
 - **Styling:** Tailwind CSS is used for all styling. Global styles are in `app/globals.css`. The `clsx` and `tailwind-merge` utilities are used for constructing conditional class names.
-- **Error Handling:** [PLACEHOLDER: Describe the primary error handling strategy, e.g., `error.tsx` files, try/catch blocks in API routes, etc.]
+- **Error Handling:** Route handlers generally use early auth checks, schema validation, and `apiError`/`apiOk` helpers for structured JSON responses. Integrations and worker-style flows rely on local `try/catch` blocks around external IO so failures can return actionable API errors without crashing the request.
 
 ## Glossary
 

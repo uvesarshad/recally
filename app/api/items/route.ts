@@ -18,8 +18,8 @@ export async function GET(req: Request) {
   const cursor = searchParams.get("cursor") || "";
   const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
 
-  let conditions = ["user_id = $1"];
-  let params: any[] = [user.id];
+  const conditions = ["user_id = $1"];
+  const params: unknown[] = [user.id];
   let paramIndex = 2;
 
   if (query) {

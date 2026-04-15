@@ -1,5 +1,6 @@
 import { answerArchiveQuestion } from "@/lib/archive-chat";
 import { requireSessionUser } from "@/lib/request-auth";
+import type { ChatMessagePayload } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,8 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { messages } = await req.json();
-  const lastUserMessage = messages.filter((m: any) => m.role === "user").pop();
+  const { messages } = (await req.json()) as { messages?: ChatMessagePayload[] };
+  const lastUserMessage = messages?.filter((message) => message.role === "user").pop();
 
   if (!lastUserMessage) {
     return new Response("No user message found", { status: 400 });
