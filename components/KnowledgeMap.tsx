@@ -18,8 +18,9 @@ import {
 } from "@xyflow/react";
 import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import "@xyflow/react/dist/style.css";
-import { Pin, PinOff, RefreshCw } from "lucide-react";
+import { Filter, Pin, PinOff, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import ItemDetailModal from "@/components/ItemDetailModal";
+import { ARCHIVE_ITEM_CREATED_EVENT, ARCHIVE_ITEMS_CHANGED_EVENT } from "@/lib/archive-events";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -79,7 +80,15 @@ const typeColors: Record<GraphNode["type"], string> = {
   file: "#fb923c",
 };
 
+const typeLabels: Record<GraphNode["type"], string> = {
+  url: "Links",
+  text: "Text",
+  note: "Notes",
+  file: "Files",
+};
+
 const collectionColors = ["#38bdf8", "#22c55e", "#f97316", "#e879f9", "#facc15", "#14b8a6"];
+const allTypes: GraphNode["type"][] = ["url", "text", "note", "file"];
 
 function fallbackPosition(index: number) {
   const col = index % 4;
@@ -100,6 +109,27 @@ function getCollectionColor(collectionId: string | null) {
   }
 
   return collectionColors[hash];
+}
+
+function matchesNodeQuery(node: GraphNode, query: string) {
+  if (!query) {
+    return true;
+  }
+
+  const normalized = query.toLowerCase();
+  const haystack = [
+    getTitle(node),
+    node.summary,
+    node.raw_url,
+    node.file_name,
+    node.source,
+    ...(node.tags || []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(normalized);
 }
 
 function ItemNodeCard({ data }: NodeProps<ItemFlowNode>) {
@@ -162,11 +192,20 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
   const [flowNodes, setFlowNodes] = useState<ItemFlowNode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [minStrength, setMinStrength] = useState(0.75);
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [activeTypes, setActiveTypes] = useState<GraphNode["type"][]>(allTypes);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch("/api/graph");
+      if (!response.ok) {
+        throw new Error("Failed to load graph");
+      }
       const data = (await response.json()) as GraphData;
       setGraphData(data);
       setFlowNodes(
@@ -219,6 +258,8 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
               : fallbackPosition(index),
         })),
       );
+    } catch {
+      setError("The knowledge map could not be loaded right now.");
     } finally {
       setLoading(false);
     }
@@ -236,44 +277,237 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
     return () => window.clearInterval(interval);
   }, [loadGraph]);
 
+  useEffect(() => {
+    const refresh = () => void loadGraph();
+    window.addEventListener(ARCHIVE_ITEM_CREATED_EVENT, refresh);
+    window.addEventListener(ARCHIVE_ITEMS_CHANGED_EVENT, refresh);
+
+    return () => {
+      window.removeEventListener(ARCHIVE_ITEM_CREATED_EVENT, refresh);
+      window.removeEventListener(ARCHIVE_ITEMS_CHANGED_EVENT, refresh);
+    };
+  }, [loadGraph]);
+
+  const visibleNodes = useMemo(
+    () =>
+      graphData.nodes.filter(
+        (node) =>
+          activeTypes.includes(node.type) &&
+          (!showPinnedOnly || node.canvas_pinned) &&
+          matchesNodeQuery(node, query),
+      ),
+    [activeTypes, graphData.nodes, query, showPinnedOnly],
+  );
+
+  const visibleNodeIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes]);
+
+  const visibleEdges = useMemo(
+    () =>
+      graphData.edges.filter(
+        (edge) =>
+          edge.strength >= minStrength &&
+          visibleNodeIds.has(edge.item_a_id) &&
+          visibleNodeIds.has(edge.item_b_id),
+      ),
+    [graphData.edges, minStrength, visibleNodeIds],
+  );
+
+  const visibleFlowNodes = useMemo(
+    () => flowNodes.filter((node) => visibleNodeIds.has(node.id)),
+    [flowNodes, visibleNodeIds],
+  );
+
   const flowEdges = useMemo<Edge[]>(
     () =>
-      graphData.edges
-        .filter((edge) => edge.strength > 0.75)
-        .map((edge) => ({
-          id: edge.id,
-          source: edge.item_a_id,
-          target: edge.item_b_id,
-          label: relationLabels[edge.relation_type],
-          animated: edge.relation_type === "user_linked",
-          style: { stroke: "#6366f1", strokeWidth: 1 + edge.strength * 2 },
-          labelStyle: { fill: "#71717a", fontSize: 11 },
-        })),
-    [graphData.edges],
+      visibleEdges.map((edge) => ({
+        id: edge.id,
+        source: edge.item_a_id,
+        target: edge.item_b_id,
+        label: relationLabels[edge.relation_type],
+        animated: edge.relation_type === "user_linked",
+        style: { stroke: "#6366f1", strokeWidth: 1 + edge.strength * 2 },
+        labelStyle: { fill: "#71717a", fontSize: 11 },
+      })),
+    [visibleEdges],
+  );
+
+  const graphCanvasData = useMemo(
+    () => ({
+      nodes: visibleNodes.map((node) => ({
+        ...node,
+        color: getCollectionColor(node.collection_id),
+        nodeTypeColor: typeColors[node.type],
+      })),
+      links: visibleEdges.map((edge) => ({
+        ...edge,
+        source: edge.item_a_id,
+        target: edge.item_b_id,
+      })),
+    }),
+    [visibleEdges, visibleNodes],
   );
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setFlowNodes((current) => applyNodeChanges(changes, current) as ItemFlowNode[]);
   }, []);
 
+  useEffect(() => {
+    if (selectedId && !visibleNodeIds.has(selectedId)) {
+      setSelectedId(null);
+    }
+  }, [selectedId, visibleNodeIds]);
+
+  function toggleType(type: GraphNode["type"]) {
+    setActiveTypes((current) =>
+      current.includes(type)
+        ? current.filter((entry) => entry !== type)
+        : [...current, type],
+    );
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setMinStrength(0.75);
+    setShowPinnedOnly(false);
+    setActiveTypes(allTypes);
+  }
+
+  const pinnedCount = visibleNodes.filter((node) => node.canvas_pinned).length;
+  const averageStrength =
+    visibleEdges.length > 0
+      ? (visibleEdges.reduce((total, edge) => total + edge.strength, 0) / visibleEdges.length).toFixed(2)
+      : "0.00";
+
   return (
     <div className="relative h-[calc(100vh-1rem)] overflow-hidden bg-bg">
-      <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-modals border border-border bg-surface/90 p-2 backdrop-blur">
-        <button
-          className={`rounded-buttons px-3 py-2 text-xs ${view === "canvas" ? "bg-brand text-white" : "text-text-mid"}`}
-          onClick={() => setView("canvas")}
-        >
-          Canvas
-        </button>
-        <button
-          className={`rounded-buttons px-3 py-2 text-xs ${view === "graph" ? "bg-brand text-white" : "text-text-mid"}`}
-          onClick={() => setView("graph")}
-        >
-          Graph
-        </button>
-        <button className="rounded-buttons p-2 text-text-mid hover:bg-surface-2" onClick={() => void loadGraph()}>
-          <RefreshCw className="h-4 w-4" />
-        </button>
+      <div className="absolute left-4 right-4 top-4 z-20 flex max-w-[28rem] flex-col gap-3">
+        <div className="flex items-center gap-2 rounded-modals border border-border bg-surface/90 p-2 backdrop-blur">
+          <button
+            className={`rounded-buttons px-3 py-2 text-xs ${view === "canvas" ? "bg-brand text-white" : "text-text-mid"}`}
+            onClick={() => setView("canvas")}
+          >
+            Canvas
+          </button>
+          <button
+            className={`rounded-buttons px-3 py-2 text-xs ${view === "graph" ? "bg-brand text-white" : "text-text-mid"}`}
+            onClick={() => setView("graph")}
+          >
+            Graph
+          </button>
+          <button className="rounded-buttons p-2 text-text-mid hover:bg-surface-2" onClick={() => void loadGraph()}>
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          <div className="ml-auto hidden text-[11px] text-text-muted sm:block">
+            {visibleNodes.length} nodes
+          </div>
+        </div>
+
+        <div className="rounded-modals border border-border bg-surface/90 p-4 backdrop-blur">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-text-muted">Map controls</div>
+              <p className="mt-1 text-sm text-text-primary">
+                Filter the knowledge map before you rearrange or inspect it.
+              </p>
+            </div>
+            <button type="button" onClick={resetFilters} className="text-xs text-brand hover:text-brand-hover">
+              Reset
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-input border border-border bg-bg px-3 py-2">
+            <Search className="h-4 w-4 text-text-muted" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filter by title, URL, tag, or source"
+              className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {allTypes.map((type) => {
+              const active = activeTypes.includes(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleType(type)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    active
+                      ? "border-transparent text-white"
+                      : "border-border bg-bg text-text-mid hover:border-brand/40 hover:text-text-primary"
+                  }`}
+                  style={active ? { backgroundColor: typeColors[type] } : undefined}
+                >
+                  {typeLabels[type]}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setShowPinnedOnly((current) => !current)}
+              className={`flex items-center justify-between rounded-cards border px-3 py-3 text-sm transition ${
+                showPinnedOnly
+                  ? "border-brand bg-brand/10 text-text-primary"
+                  : "border-border bg-bg text-text-mid hover:text-text-primary"
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Pinned only
+              </span>
+              {showPinnedOnly ? <Pin className="h-4 w-4 text-brand" /> : <PinOff className="h-4 w-4" />}
+            </button>
+
+            <div className="rounded-cards border border-border bg-bg px-3 py-3">
+              <div className="mb-2 inline-flex items-center gap-2 text-sm text-text-primary">
+                <SlidersHorizontal className="h-4 w-4 text-brand" />
+                Relation strength
+              </div>
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={minStrength}
+                onChange={(event) => setMinStrength(Number(event.target.value))}
+                className="w-full accent-brand"
+              />
+              <div className="mt-1 text-xs text-text-muted">Show links from {minStrength.toFixed(2)} and up</div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <StatCard label="Visible nodes" value={String(visibleNodes.length)} />
+            <StatCard label="Visible links" value={String(visibleEdges.length)} />
+            <StatCard label="Pinned" value={String(pinnedCount)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute bottom-4 left-4 z-20 hidden w-72 rounded-modals border border-border bg-surface/90 p-4 backdrop-blur xl:block">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-text-muted">Legend</div>
+        <div className="mt-3 space-y-2">
+          {allTypes.map((type) => (
+            <div key={type} className="flex items-center justify-between text-sm text-text-primary">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: typeColors[type] }} />
+                {typeLabels[type]}
+              </span>
+              <span className="text-xs text-text-muted">
+                {visibleNodes.filter((node) => node.type === type).length}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-cards border border-border bg-bg px-3 py-3 text-xs text-text-muted">
+          Drag cards in canvas mode to arrange your space. Graph mode is better for spotting dense clusters and strong relation overlap.
+        </div>
+        <div className="mt-3 text-xs text-text-muted">Average visible link strength: {averageStrength}</div>
       </div>
 
       {loading ? (
@@ -282,11 +516,36 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
         </div>
       ) : null}
 
-      {view === "canvas" ? (
+      {error ? (
+        <div className="absolute right-4 top-20 z-20 max-w-sm rounded-buttons border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div>{error}</div>
+          <button type="button" onClick={() => void loadGraph()} className="mt-2 text-xs font-medium text-rose-100">
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && visibleNodes.length === 0 ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center px-4">
+          <div className="max-w-md rounded-modals border border-border bg-surface p-6 text-center">
+            <h2 className="text-lg font-semibold text-text-primary">No nodes match the current filters</h2>
+            <p className="mt-2 text-sm text-text-muted">
+              Broaden the search, re-enable a type, or lower the relation threshold to bring the map back.
+            </p>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="mt-4 rounded-buttons bg-brand px-4 py-2 text-sm font-medium text-white"
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+      ) : view === "canvas" ? (
         <div className="h-full">
           <ReactFlowProvider>
             <ReactFlow
-              nodes={flowNodes}
+              nodes={visibleFlowNodes}
               edges={flowEdges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
@@ -316,19 +575,10 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
       ) : (
         <div className="h-full">
           <ForceGraph2D
-            graphData={{
-              nodes: graphData.nodes.map((node) => ({
-                ...node,
-                color: getCollectionColor(node.collection_id),
-                nodeTypeColor: typeColors[node.type],
-              })),
-              links: graphData.edges.map((edge) => ({
-                ...edge,
-                source: edge.item_a_id,
-                target: edge.item_b_id,
-              })),
-            }}
+            graphData={graphCanvasData}
+            backgroundColor="#0f0f11"
             nodeRelSize={7}
+            linkColor={() => "rgba(99,102,241,0.35)"}
             linkWidth={(link) => 1 + Number((link as GraphCanvasLink).strength ?? 0) * 2}
             nodeCanvasObject={(node, ctx: CanvasRenderingContext2D, globalScale: number) => {
               const graphNode = node as GraphCanvasNode;
@@ -385,6 +635,15 @@ export default function KnowledgeMap({ initialMode }: { initialMode: ViewMode })
       )}
 
       <ItemDetailModal itemId={selectedId || ""} open={!!selectedId} onClose={() => setSelectedId(null)} />
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-cards border border-border bg-bg px-3 py-3">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-text-muted">{label}</div>
+      <div className="mt-2 text-xl font-semibold text-text-primary">{value}</div>
     </div>
   );
 }

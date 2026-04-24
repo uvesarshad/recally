@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Recall — Save anything. Find everything.",
+  title: "Recall - Save anything. Find everything.",
   description: "Frictionless capture + intelligent organisation + visual recall tool.",
 };
 
@@ -12,9 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
-        <script
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `try{var theme=localStorage.getItem("recall-theme");if(theme){document.documentElement.dataset.theme=JSON.parse(theme)}}catch(e){}`,
           }}

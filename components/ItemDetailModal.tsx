@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Calendar, ExternalLink, Link2, MessageSquare, Tag, Trash2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import ActionPreview, { type ActionOverrideValue, type ActionPreviewValue } from "@/components/ActionPreview";
+import { dispatchArchiveItemsChanged } from "@/lib/archive-events";
 import { resolvePreviewImageUrl } from "@/lib/item-preview";
 import type { ArchiveComment, ArchiveItem, CollectionRecord } from "@/lib/types";
 
@@ -29,7 +29,6 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
   const [draftCollectionId, setDraftCollectionId] = useState("");
   const [draftNewCategory, setDraftNewCategory] = useState("");
   const [draftReminderAt, setDraftReminderAt] = useState("");
-  const router = useRouter();
 
   const load = useCallback(async () => {
     const [itemRes, commentsRes, collectionsRes] = await Promise.all([
@@ -39,7 +38,9 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
     ]);
     const itemData = (await itemRes.json()) as { item?: ArchiveItem | null };
     const commentsData = (await commentsRes.json()) as { comments?: ArchiveComment[] };
-    const collectionsData = (await collectionsRes.json()) as { collections?: Array<Pick<CollectionRecord, "id" | "name">> };
+    const collectionsData = (await collectionsRes.json()) as {
+      collections?: Array<Pick<CollectionRecord, "id" | "name">>;
+    };
     setItem(itemData.item ?? null);
     setComments(commentsData.comments || []);
     setCollections(collectionsData.collections || []);
@@ -85,6 +86,21 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
     setDraftReminderAt(toLocalDateTimeValue(item.reminder_at));
   }, [item]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
   if (!open) return null;
 
   async function handleCommentSubmit() {
@@ -102,7 +118,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
       setPreview(null);
       setOverrides({});
       await load();
-      router.refresh();
+      dispatchArchiveItemsChanged();
     } finally {
       setLoading(false);
     }
@@ -112,8 +128,8 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
     const confirmed = window.confirm("Delete this item?");
     if (!confirmed) return;
     await fetch(`/api/items/${itemId}`, { method: "DELETE" });
+    dispatchArchiveItemsChanged();
     onClose();
-    router.refresh();
   }
 
   async function saveMetadata() {
@@ -150,7 +166,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
       });
 
       await load();
-      router.refresh();
+      dispatchArchiveItemsChanged();
     } finally {
       setSavingMeta(false);
     }
@@ -167,8 +183,19 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
   const previewImageUrl = resolvePreviewImageUrl(item?.image_url, item?.raw_url);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-modals border border-border bg-surface shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-modals border border-border bg-surface shadow-2xl"
+      >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-text-muted">{item?.type || "item"}</div>
@@ -191,7 +218,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                 <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">Title</div>
                 <input
                   value={draftTitle}
-                  onChange={(e) => setDraftTitle(e.target.value)}
+                  onChange={(event) => setDraftTitle(event.target.value)}
                   placeholder="Untitled"
                   className="w-full rounded-input border border-border bg-bg px-3 py-3 text-base font-semibold text-text-primary outline-none focus:border-brand"
                 />
@@ -201,7 +228,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                 <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">Summary</div>
                 <textarea
                   value={draftSummary}
-                  onChange={(e) => setDraftSummary(e.target.value)}
+                  onChange={(event) => setDraftSummary(event.target.value)}
                   rows={4}
                   placeholder="Add a concise summary for this item."
                   className="w-full rounded-input border border-border bg-bg px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
@@ -212,6 +239,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                 <section className="rounded-cards border border-border bg-bg p-4">
                   <div className="flex items-start gap-3">
                     {previewImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- preview image hosts are derived from saved content and not constrained to static domains
                       <img src={previewImageUrl} alt={item.title || "Link preview"} className="h-16 w-24 rounded-md object-cover" />
                     ) : (
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
@@ -241,7 +269,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
               ) : null}
 
               {item?.raw_text ? (
-                <div className="rounded-cards border border-border bg-bg p-4 text-sm text-text-mid whitespace-pre-wrap">
+                <div className="rounded-cards border border-border bg-bg p-4 whitespace-pre-wrap text-sm text-text-mid">
                   {item.raw_text}
                 </div>
               ) : null}
@@ -251,7 +279,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                   <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">Tags</div>
                   <input
                     value={draftTagsInput}
-                    onChange={(e) => setDraftTagsInput(e.target.value)}
+                    onChange={(event) => setDraftTagsInput(event.target.value)}
                     placeholder="ai, reading, startup"
                     className="w-full rounded-input border border-border bg-bg px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
                   />
@@ -273,7 +301,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                   <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">Folder</div>
                   <select
                     value={draftCollectionId}
-                    onChange={(e) => setDraftCollectionId(e.target.value)}
+                    onChange={(event) => setDraftCollectionId(event.target.value)}
                     className="w-full rounded-input border border-border bg-bg px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
                   >
                     <option value="">No folder</option>
@@ -285,7 +313,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                   </select>
                   <input
                     value={draftNewCategory}
-                    onChange={(e) => setDraftNewCategory(e.target.value)}
+                    onChange={(event) => setDraftNewCategory(event.target.value)}
                     placeholder="Or create a new folder"
                     className="w-full rounded-input border border-border bg-bg px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
                   />
@@ -315,7 +343,7 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
                   <input
                     type="datetime-local"
                     value={draftReminderAt}
-                    onChange={(e) => setDraftReminderAt(e.target.value)}
+                    onChange={(event) => setDraftReminderAt(event.target.value)}
                     className="w-full rounded-input border border-border bg-surface px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
                   />
                 </div>
@@ -367,12 +395,16 @@ export default function ItemDetailModal({ itemId, open, onClose }: ItemDetailMod
             <div className="shrink-0 border-t border-border bg-surface p-4">
               <textarea
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(event) => setComment(event.target.value)}
                 rows={4}
                 placeholder="Add a comment or action..."
                 className="w-full rounded-input border border-border bg-bg px-3 py-3 text-sm text-text-primary outline-none focus:border-brand"
               />
-              {preview ? <div className="mt-3"><ActionPreview preview={preview} overrides={overrides} onChange={setOverrides} /></div> : null}
+              {preview ? (
+                <div className="mt-3">
+                  <ActionPreview preview={preview} overrides={overrides} onChange={setOverrides} />
+                </div>
+              ) : null}
               <div className="mt-3 flex justify-end">
                 <button
                   onClick={handleCommentSubmit}

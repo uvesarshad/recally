@@ -1,19 +1,10 @@
 import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
-import Resend from "next-auth/providers/resend";
+
 import { env } from "@/lib/env";
 
 export const authConfig = {
   secret: env.AUTH_SECRET,
-  providers: [
-    Google({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-    }),
-    Resend({
-      from: `Recall <no-reply@${env.APP_DOMAIN}>`,
-    }),
-  ],
+  providers: [],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const devBypass = env.DEV_BYPASS_LOGIN === "true";

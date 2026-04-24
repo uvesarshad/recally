@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ListPlus, Sparkles, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import ActionPreview, { type ActionOverrideValue, type ActionPreviewValue } from "@/components/ActionPreview";
+import { dispatchArchiveItemCreated, dispatchArchiveItemsChanged } from "@/lib/archive-events";
 
 export function openCreateDialog() {
   window.dispatchEvent(new CustomEvent("recall:create"));
@@ -57,13 +57,27 @@ export default function CreateItemDialog() {
   const [preview, setPreview] = useState<ActionPreviewValue | null>(null);
   const [overrides, setOverrides] = useState<ActionOverrideValue>({});
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     const handler = () => setOpen(true);
     window.addEventListener("recall:create", handler);
     return () => window.removeEventListener("recall:create", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   useEffect(() => {
     if (!open || mode !== "single" || !content.trim()) {
@@ -107,12 +121,19 @@ export default function CreateItemDialog() {
       if (!response.ok) {
         throw new Error("Failed to create item");
       }
+      const data = (await response.json()) as { id?: string; count?: number; items?: Array<{ id?: string }> };
       setOpen(false);
       setMode("single");
       setContent("");
       setPreview(null);
       setOverrides({});
-      router.refresh();
+      if (mode === "bulk") {
+        dispatchArchiveItemsChanged();
+      } else if (data.id) {
+        dispatchArchiveItemCreated(data.id);
+      } else if (data.items?.[0]?.id) {
+        dispatchArchiveItemCreated(data.items[0].id);
+      }
     } finally {
       setLoading(false);
     }
@@ -121,8 +142,19 @@ export default function CreateItemDialog() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-modals border border-border bg-surface shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          setOpen(false);
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-modals border border-border bg-surface shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Create Item</h2>
@@ -158,7 +190,7 @@ export default function CreateItemDialog() {
           </div>
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(event) => setContent(event.target.value)}
             placeholder={
               mode === "bulk"
                 ? "https://example.com/article\nReview pricing page next week\nhttps://another-site.com/report"

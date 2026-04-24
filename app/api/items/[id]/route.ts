@@ -27,12 +27,14 @@ export async function GET(
   const { id } = await params;
 
   const result = await db.query(
-    `SELECT id, type, title, summary, tags, source, created_at, updated_at,
-            raw_url, raw_text, collection_id, canvas_x, canvas_y, canvas_pinned,
+    `SELECT items.id, items.type, items.title, items.summary, items.tags, items.source, items.created_at, items.updated_at,
+            items.raw_url, items.raw_text, items.collection_id, collections.name AS collection_name,
+            items.canvas_x, items.canvas_y, items.canvas_pinned,
             enriched, enriched_at, reminder_at, reminder_sent, 
             file_path, file_name, file_mime_type, capture_note, image_url
-     FROM items 
-     WHERE id = $1 AND user_id = $2`,
+     FROM items
+     LEFT JOIN collections ON collections.id = items.collection_id
+     WHERE items.id = $1 AND items.user_id = $2`,
     [id, user.id]
   );
 

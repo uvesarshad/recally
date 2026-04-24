@@ -3,7 +3,7 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  AUTH_SECRET: z.string().min(1).optional(),
+  AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
   APP_URL: z.string().url().optional(),
   APP_DOMAIN: z.string().min(1).optional(),
   SELF_HOSTED: z.enum(["true", "false"]).optional(),
@@ -16,6 +16,7 @@ const envSchema = z.object({
   RESEND_INBOUND_SECRET: z.string().min(1).optional(),
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
+  EMAIL_FROM: z.string().email().optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),

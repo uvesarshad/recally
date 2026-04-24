@@ -54,7 +54,9 @@ export default async function AppLoginPage({
                 type="submit"
                 className="flex w-full items-center justify-center gap-2 rounded-buttons bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-gray-100"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="h-4 w-4" />
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#4285F4] text-[10px] font-bold text-white">
+                  G
+                </span>
                 Continue with Google
               </button>
             </form>

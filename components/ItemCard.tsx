@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, File, FileText, Link2, MessageSquare, StickyNote, Trash2 } from "lucide-react";
+import { Bell, CheckSquare2, File, FileText, Link2, MessageSquare, Square, StickyNote, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import ItemDetailModal from "@/components/ItemDetailModal";
 import { resolvePreviewImageUrl } from "@/lib/item-preview";
@@ -20,10 +20,16 @@ export default function ItemCard({
   item,
   highlight,
   view = "list",
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
 }: {
   item: ArchiveItem;
   highlight?: string;
   view?: "grid" | "list";
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (itemId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -82,13 +88,38 @@ export default function ItemCard({
   return (
     <>
       <article
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (selectionMode) {
+            onToggleSelect?.(item.id);
+            return;
+          }
+          setOpen(true);
+        }}
         className={`relative cursor-pointer rounded-cards border border-border-soft bg-surface transition-all hover:border-brand/40 hover:bg-surface-2 ${
           view === "grid" ? "flex h-full flex-col p-4" : "flex flex-col gap-3 p-4"
-        }`}
+        } ${selected ? "border-brand ring-1 ring-brand/40" : ""}`}
       >
+        {selectionMode ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelect?.(item.id);
+            }}
+            className={`absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border ${
+              selected
+                ? "border-brand bg-brand text-white"
+                : "border-border bg-surface text-text-muted"
+            }`}
+            aria-label={selected ? "Deselect item" : "Select item"}
+          >
+            {selected ? <CheckSquare2 className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+          </button>
+        ) : null}
+
         {previewImageUrl ? (
           <div className="mb-3 aspect-[1.91/1] overflow-hidden rounded-md">
+            {/* eslint-disable-next-line @next/next/no-img-element -- preview image hosts are derived from saved content and not constrained to static domains */}
             <img src={previewImageUrl} alt={item.title || "Preview"} className="h-full w-full object-cover" />
           </div>
         ) : item.type === "url" && item.raw_url ? (
@@ -204,7 +235,7 @@ export default function ItemCard({
           <div className="mt-3 border-t border-border pt-3" onClick={(event) => event.stopPropagation()}>
             <textarea
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(event) => setComment(event.target.value)}
               rows={3}
               placeholder="Add a comment or action..."
               className="w-full rounded-input border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand"
@@ -223,7 +254,7 @@ export default function ItemCard({
         ) : null}
       </article>
 
-      <ItemDetailModal itemId={item.id} open={open} onClose={() => setOpen(false)} />
+      {!selectionMode ? <ItemDetailModal itemId={item.id} open={open} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
